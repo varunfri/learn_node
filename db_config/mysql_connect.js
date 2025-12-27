@@ -12,6 +12,7 @@ export const mysql_db = mysql.createPool({
     multipleStatements: true,
     waitForConnections: true,
     connectionLimit: 10,
+    dateStrings: true
 });
 
 export const connect_mysql = async () => {

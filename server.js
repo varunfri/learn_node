@@ -1,7 +1,7 @@
 // in this file we write main code for starting the express server
 import dotenv from "dotenv";
-
 import app from "./app.js";
+import "./utils/firebaseAdmin.js";
 import connectMongo from "./db_config/mongo_connect.js";
 import { connect_mysql } from "./db_config/mysql_connect.js";
 dotenv.config({

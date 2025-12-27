@@ -18,3 +18,18 @@ export const generateRefresh = (payload) => {
         }
     );
 };
+
+export const buildAuthPayload = (rows) => {
+    const roles = new Set();
+    const authorities = new Set();
+
+    for (const row of rows) {
+        roles.add(row.role_name);
+        authorities.add(row.authority_name);
+    }
+
+    return {
+        roles: [...roles],
+        authorities: [...authorities]
+    };
+};

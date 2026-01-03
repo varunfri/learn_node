@@ -27,4 +27,3 @@ router.post('/add_gift', authorize, authority('ADMIN'), add_gift);
 //add bulk gifts
 router.post('/add_bulk_gifts', authorize, authority('ADMIN'), add_bulk_gift);
 export default router;
-

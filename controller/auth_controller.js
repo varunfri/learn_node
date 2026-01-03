@@ -210,9 +210,11 @@ export const refreshToken = async (req, res) => {
         });
     }
 
+
+
     //verify the token 
     try {
-        const decode = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+        const decode = jwt.verify(refreshToken.split(" ")[1], process.env.REFRESH_SECRET);
         const payload = { id: decode.id, roles: decode.roles, authorities: decode.authorities };
 
         const newJwt = generateJwt(payload);

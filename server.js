@@ -9,12 +9,12 @@ import { verifySocketToken } from "./middleware/auth_middleware.js";
 import { initSocket } from "./utils/init_socket.js";
 import { chatRequestHandlers } from "./controller/socket_controllers/message_socket.js";
 
-
 const httpServer = createServer(app);
 
 dotenv.config({
     path: './.env',
 });
+
 
 
 const io = initSocket(httpServer);

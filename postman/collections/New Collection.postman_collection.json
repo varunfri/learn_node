@@ -1,0 +1,161 @@
+{
+  "info": {
+    "_postman_id": "1f60a552-0426-4a8d-90b7-bd01d34e3103",
+    "name": "Soulzaa_backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "sign_in_up",
+      "item": [
+        {
+          "name": "check_user",
+          "id": "c177d674-2ec1-4552-9f83-f5b12dd67585",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "{{id_token_key}}",
+                "value": "{{id_token}}",
+                "type": "text",
+                "uuid": "d9a1672d-725f-41dd-aed7-79c63af6add6"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/check_user",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "check_user"
+              ],
+              "query": [
+                {
+                  "key": "{{id_token_key}}",
+                  "value": "{{id_token}}",
+                  "uuid": "f884212e-e986-420b-8632-18c05d7f68b2",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "sign_in",
+          "id": "be26a2cf-6a1b-4279-bdca-4fac9bbc3ae8",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{id_token_key}}",
+                "value": "{{id_token}}",
+                "type": "text",
+                "uuid": "2a191d50-5e09-46fa-a601-a3c873abe734"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/sign_in",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign_in"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "sign_up",
+          "id": "52eb8c06-358b-4f15-943c-345e26faa486",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "{{id_token_key}}",
+                "value": "{{id_token}}",
+                "type": "text",
+                "uuid": "7dd7e5b0-c182-43b1-a85a-dbd65265a31e"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/sign_in",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign_in"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "refresh_token",
+          "id": "dab976f5-45b3-4693-9636-59afc2c19b7c",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "{{refresh_token_key}}",
+                "value": "{{refresh_token}}",
+                "type": "text",
+                "uuid": "074d5fec-4d77-4c23-95b6-a30368624b88"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh_token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh_token"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "d1ecb9a1-4ba7-499a-8476-850164172342"
+    },
+    {
+      "name": "coins",
+      "item": [
+        {
+          "name": "get_conis",
+          "id": "a67fe84a-c6f3-4813-bb5b-687e17afea49",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "063c6011-79da-429e-b70e-57d5f38fca1b"
+    },
+    {
+      "name": "New Request",
+      "id": "95280d0a-0ee9-4d01-b0bb-9705ee1b9838",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": ""
+        }
+      },
+      "response": []
+    }
+  ]
+}

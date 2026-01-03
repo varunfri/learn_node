@@ -1,0 +1,569 @@
+openapi: 3.0.0
+info:
+  title: Soulzaa Backend
+  version: 1.0.0
+  description: ''
+servers:
+  - url: http://localhost:5000
+paths:
+  /api/auth/check_user:
+    get:
+      summary: check_user
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{id_token}}'
+      responses:
+        '200':
+          description: User exists
+        '401':
+          description: Unauthorized - Invalid or missing token
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+      tags:
+        - sign_in_&_up
+  /api/auth/sign_up:
+    post:
+      summary: sign_up
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{id_token}}'
+      responses:
+        '201':
+          description: User successfully registered
+        '400':
+          description: Bad request - Invalid input data
+        '401':
+          description: Unauthorized - Invalid token
+        '500':
+          description: Internal server error
+      tags:
+        - sign_in_&_up
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firebase_uid:
+                  type: string
+                fullname:
+                  type: string
+                dob:
+                  type: string
+                  format: date
+                gender:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                auth_provider:
+                  type: string
+                country:
+                  type: string
+                country_code:
+                  type: string
+                state:
+                  type: string
+                state_district:
+                  type: string
+                county:
+                  type: string
+                post_code:
+                  type: string
+                languages:
+                  type: array
+                  items:
+                    type: integer
+            example:
+              firebase_uid: EvxEvSLajGVv5KTsN4TRQInMY0i2
+              fullname: Soulzaa
+              dob: '1990-01-01'
+              gender: other
+              email: soulzaa.project@gmail.com
+              auth_provider: google
+              country: India
+              country_code: IN
+              state: Karnataka
+              state_district: Bengaluru Urban
+              county: Anekal
+              post_code: '562106'
+              languages:
+                - 1
+                - 2
+  /api/auth/sign_in:
+    post:
+      summary: sign_in
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{id_token}}'
+      responses:
+        '200':
+          description: User successfully signed in
+        '400':
+          description: Bad request - Missing credentials
+        '401':
+          description: Unauthorized - Invalid credentials
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+      tags:
+        - sign_in_&_up
+  /api/location:
+    get:
+      summary: location
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{id_token}}'
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Location data retrieved successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - sign_in_&_up
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+            example: {}
+  /api/auth/refresh_token:
+    get:
+      summary: refresh_token
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+        - name: '{{refresh_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{refresh_token}}'
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+        '401':
+          description: Unauthorized - Invalid or expired refresh token
+        '500':
+          description: Internal server error
+      tags:
+        - sign_in_&_up
+  /api/user/profile:
+    get:
+      summary: user_profile
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: User profile retrieved successfully
+        '401':
+          description: Unauthorized - Invalid or missing auth token
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+      tags:
+        - user_related
+  /api/live_stream/get_stream_token:
+    get:
+      summary: get_stream_token
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Stream token generated successfully
+        '400':
+          description: Bad request - Invalid parameters
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - live_stream
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: integer
+                channel_name:
+                  type: string
+                role:
+                  type: string
+            example:
+              uid: 1
+              channel_name: Varun
+              role: publisher
+  /api/coins/get_coins:
+    get:
+      summary: get_coin_balance
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Coin balance retrieved successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+      tags:
+        - coins
+  /api/coins/get_coins_transaction:
+    get:
+      summary: get_coins_transactions
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Coin transactions retrieved successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - coins
+  /api/coins/get_purchase_history:
+    get:
+      summary: get_purchase_history
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Purchase history retrieved successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - coins
+  /api/coins/purchase_coins:
+    post:
+      summary: purchase_coins
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '201':
+          description: Coins purchased successfully
+        '400':
+          description: Bad request - Invalid purchase data
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - coins
+  /api/gifts/add_gift:
+    post:
+      summary: add_gift
+      parameters:
+        - name: '{{id_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{id_token}}'
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '201':
+          description: Gift added successfully
+        '400':
+          description: Bad request - Invalid gift data
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gift_name:
+                  type: string
+                gift_icon_url:
+                  type: string
+                coin_cost:
+                  type: integer
+            example:
+              gift_name: single_add
+              gift_icon_url: iaod
+              coin_cost: 150
+  /api/gifts/add_bulk_gifts:
+    post:
+      summary: add_bulk_gifts
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '201':
+          description: Gifts added successfully
+        '400':
+          description: Bad request - Invalid gift data
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gifts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      gift_name:
+                        type: string
+                      gift_icon_url:
+                        type: string
+                      coin_cost:
+                        type: string
+            example:
+              gifts:
+                - gift_name: check_1
+                  gift_icon_url: icon_1
+                  coin_cost: '14'
+                - gift_name: check_2
+                  gift_icon_url: icon_2
+                  coin_cost: '5'
+  /api/gifts/get_gifts:
+    get:
+      summary: get_gifts
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gifts retrieved successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+  /api/gifts/enable_gift/{id}:
+    put:
+      summary: enable_gift
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gift enabled/disabled successfully
+        '400':
+          description: Bad request
+        '404':
+          description: Gift not found
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Add the gift id
+        deprecated: false
+        schema:
+          type: integer
+        example: '1'
+  /api/gifts/disable_gift/{id}:
+    put:
+      summary: disable_gift
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gift enabled/disabled successfully
+        '400':
+          description: Bad request
+        '404':
+          description: Gift not found
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: 'Pass the gift id '
+        deprecated: false
+        schema:
+          type: integer
+        example: '1'
+  /api/gifts/update_gift:
+    put:
+      summary: update_gift
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gift updated successfully
+        '400':
+          description: Bad request - Invalid gift data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Gift not found
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gift_id:
+                  type: integer
+                gift_name:
+                  type: string
+                ' gift_icon_url':
+                  type: string
+                coin_cost:
+                  type: string
+            example:
+              gift_id: 1
+              gift_name: heart
+              ' gift_icon_url': ''
+              coin_cost: '150'
+  /api/gifts/is_gift_animated/{id}:
+    put:
+      summary: update_animated
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gift animation status updated successfully
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Gift not found
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Add the gift id
+        deprecated: false
+        schema:
+          type: integer
+        example: '1'
+  /api/gifts/delete_gift/{id}:
+    delete:
+      summary: delete_gift
+      parameters:
+        - name: '{{auth_token_key}}'
+          in: header
+          schema:
+            type: string
+          example: '{{auth_token}}'
+      responses:
+        '200':
+          description: Gift deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Gift not found
+        '500':
+          description: Internal server error
+      tags:
+        - gifts
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Add the gift id
+        deprecated: false
+        schema:
+          type: integer
+        example: '1'

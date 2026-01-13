@@ -6,7 +6,7 @@ import { authFirebase } from "../middleware/auth_middleware.js";
 const router = express.Router();
 
 
-router.post('/location', authFirebase, locationDetail);
+router.get('/location', authFirebase, locationDetail);
 
 
 export default router;

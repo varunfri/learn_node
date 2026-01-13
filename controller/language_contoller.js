@@ -12,9 +12,13 @@ export const languages = async (req, res) => {
         });
     }
     const data = rows.reduce((acc, row) => {
-        acc[row.language_id] = row.language_name;
+        acc.push({
+            id: row.language_id,
+            language: row.language_name,
+        });
         return acc;
-    }, {});
+    }, []);
+
 
     console.log(data);
 
@@ -38,7 +42,7 @@ export const updateUserLanguages = async (req, res) => {
             message: "Request body is required"
         });
     }
-     const { languages } = req.body || {};
+    const { languages } = req.body || {};
 
     const connection = await mysql_db.getConnection();
     try {

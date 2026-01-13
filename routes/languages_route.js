@@ -4,6 +4,6 @@ import { languages } from "../controller/language_contoller.js";
 
 const router = express.Router();
 
-router.get('/languages', authorize, languages);
+router.get('/languages', languages);
 
 export default router;

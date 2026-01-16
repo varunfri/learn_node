@@ -8,6 +8,8 @@ import agora_token_route from './routes/stream_token_route.js';
 import coins_route from "./routes/coins_route.js";
 import gift_routes from './routes/gifts_route.js';
 import image_route from './utils/image_kit_config.js';
+import get_live_users_route from './routes/live_routes.js';
+import get_all_users_route from './routes/all_users_route.js';
 import { swaggerDocs } from "./swagger/swagger.js";
 
 const app = express();
@@ -30,8 +32,13 @@ app.use('/api/user', user_router);
 app.use('/api', location_router);
 app.use('/api', language_router)
 
-//agora token router
+//agora token router and other live routes
 app.use('/api/live_stream', agora_token_route);
+app.use('/api/live_stream', get_live_users_route);
+
+// fetch all users
+app.use('/api/users', get_all_users_route);
+
 
 // coins routes
 app.use('/api/coins', coins_route);

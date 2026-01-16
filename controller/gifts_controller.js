@@ -216,8 +216,8 @@ export const get_gifts = async (req, res) => {
         );
 
         if (result.length === 0) {
-            return res.status(400).json({
-                status: 500,
+            return res.status(404).json({
+                status: 404,
                 message: "No gifts found"
             });
         }

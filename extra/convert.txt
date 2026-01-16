@@ -1,0 +1,6 @@
+convert file
+(Get-Content "D:\flutter-sdk\flutter_works\soulzaa_complete\learn_node\extra\sz_backend.sql") -replace 'utf8mb4_0900_ai_ci', 'utf8mb4_unicode_ci' | Set-Content "D:\flutter-sdk\flutter_works\soulzaa_complete\learn_node\extra\sz_backend_fixed.sql"
+
+
+send data to db
+Get-Content "D:\flutter-sdk\flutter_works\soulzaa_complete\learn_node\extra\sz_backend_fixed.sql" | mysql -u varun -h varun.ddns.net -p sz_backend

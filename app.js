@@ -27,6 +27,7 @@ swaggerDocs(app);
 app.get('/', (req, res) => {
     res.send("Server is running");
 }); // this route to get to know the server is running 
+app.set('trust proxy', true);
 
 
 app.use('/api/auth', auth_router);

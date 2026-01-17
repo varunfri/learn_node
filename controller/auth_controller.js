@@ -45,7 +45,6 @@ const generateUsername = (uid) => {
     return uid.slice(0, 5) + "_" + uid.slice(-4);
 };
 
-
 export const sign_up = async (req, res) => {
     if (!req.body || Object.keys(req.body).length === 0) {
         return res.status(400).json({
@@ -54,10 +53,23 @@ export const sign_up = async (req, res) => {
         });
     }
 
-    const { firebase_uid, fullname, dob, gender, email, auth_provider, country, country_code, state, state_district, county, post_code, languages } = req.body || {};
+    const {
+        firebase_uid,
+        fullname,
+        dob,
+        gender,
+        email,
+        phone,
+        auth_provider,
+        country,
+        country_code,
+        state,
+        state_district,
+        county,
+        post_code,
+        languages = []
+    } = req.body;
 
-
-    // const passwordHash = await bcrypt.hash(password, 10);
     const connection = await mysql_db.getConnection();
 
     try {
@@ -65,68 +77,111 @@ export const sign_up = async (req, res) => {
 
         const username = generateUsername(firebase_uid);
 
+
         const [userResult] = await connection.query(
-            'Insert into users (firebase_uid, full_name, dob, gender, email, auth_provider) values (?, ?,?,?,?,?)',
-            [firebase_uid, fullname, dob, gender, email, auth_provider]
+            `INSERT INTO users (
+        firebase_uid,
+        full_name,
+        dob,
+        gender,
+        email,
+        phone,
+        auth_provider
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                firebase_uid,
+                fullname,
+                dob,
+                gender,
+                toNull(email),
+                toNull(phone),
+                auth_provider
+            ]
         );
 
-        const userId = userResult.insertId; //getting user_id from above query
+        const userId = userResult.insertId;
 
-        await connection.query( // insert into user_location
-            'insert into user_location (user_id, country, country_code,state,state_district,county,post_code) values(?,?,?,?,?,?,?)',
-            [userId, country, country_code, state, state_district, county, post_code]
+        // user_location
+        await connection.query(
+            `INSERT INTO user_location (
+        user_id,
+        country,
+        country_code,
+        state,
+        state_district,
+        county,
+        post_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                userId,
+                toNull(country),
+                toNull(country_code),
+                toNull(state),
+                toNull(state_district),
+                toNull(county),
+                toNull(post_code)
+            ]
         );
 
-        await connection.query( // insert into user_roles
+        // user_roles
+        await connection.query(
             `INSERT INTO user_roles (user_id, role_id) VALUES ?`,
             [[[userId, 1], [userId, 2]]]
         );
 
-        await connection.query( // insert into usernames
-            'insert into usernames (user_id, username, is_active) values (?, ?, ?)',
-            [userId, username, 1]
+        // usernames
+        await connection.query(
+            `INSERT INTO usernames (user_id, username, is_active)
+       VALUES (?, ?, 1)`,
+            [userId, username]
         );
 
-        await connection.query( //creating a data in user_wallets
-            `
-            insert into user_wallets(user_id) values (?);
-            `, [userId]
+        // user_wallets
+        await connection.query(
+            `INSERT INTO user_wallets (user_id) VALUES (?)`,
+            [userId]
         );
 
-        await connection.query( //adding data to user_languages 
-            `
-            insert ignore into user_languages(user_id, language_id) values ?;
-            `, [languages.map(id => [userId, id])]);
+        // user_languages (only if provided)
+        if (Array.isArray(languages) && languages.length > 0) {
+            await connection.query(
+                `INSERT IGNORE INTO user_languages (user_id, language_id) VALUES ?`,
+                [languages.map(id => [userId, id])]
+            );
+        }
 
         await connection.commit();
 
-        res.status(201).json({
+        return res.status(201).json({
             status: 201,
-            message: "User registered successfully",
+            message: "User registered successfully"
         });
 
     } catch (error) {
         await connection.rollback();
+        console.error(error);
 
-        console.log(error);
-
-        if (error && error.code === "ER_DUP_ENTRY") {
+        if (error.code === "ER_DUP_ENTRY") {
             return res.status(409).json({
                 status: 409,
-                message: `User already exist`,
+                message: "User already exists"
             });
         }
 
-        if (error && (error.code || error.sqlMessage || (error.message && error.message.includes('Data truncated')))) {
+        if (
+            error.code ||
+            error.sqlMessage ||
+            error.message?.includes("Data truncated")
+        ) {
             return res.status(400).json({
                 status: 400,
-                message: `Data Error ${error}`,
+                message: "Invalid data provided"
             });
         }
 
         return res.status(500).json({
             status: 500,
-            message: "Internal server error",
+            message: "Internal server error"
         });
 
     } finally {

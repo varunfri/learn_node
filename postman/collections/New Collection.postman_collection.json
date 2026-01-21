@@ -117,20 +117,6 @@
                 "type": "text",
                 "uuid": "36170772-915c-49e4-a025-8e89663baeff",
                 "disabled": true
-              },
-              {
-                "key": "{{refresh_token_key}}",
-                "value": "{{refresh_token_2}}",
-                "type": "text",
-                "uuid": "a63d0aa0-a813-4426-a05d-e8fa750a1d15",
-                "disabled": true
-              },
-              {
-                "key": "",
-                "value": "{{jwt_token_2}}",
-                "type": "text",
-                "uuid": "a25d9ad3-b790-4fe3-bf57-08818e2120c1",
-                "disabled": true
               }
             ],
             "url": {
@@ -3051,10 +3037,6 @@
                 "type": "text"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"liveId\": \"live_id_here\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/api/live_stream/end/:stream_id",
               "host": [
@@ -3069,7 +3051,7 @@
               "variable": [
                 {
                   "key": "stream_id",
-                  "value": "2"
+                  "value": "3"
                 }
               ]
             },

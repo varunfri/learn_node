@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
-import { ChatModel, MessageModel } from "../db_config/mongo_schemas/chat_schema.js";
+import { ChatModel, MessageModel, UserModel } from "../db_config/mongo_schemas/chat_schema.js";
+import { syncUserToMongo, syncMultipleUsersToMongo } from "../utils/mongo_sync.js";
 
 /**
  * Get chat requests (pending chats)
@@ -14,10 +15,19 @@ export const getRequestedChats = async (req, res) => {
             status: "pending",
             requestedBy: { $ne: userId },
         })
-            .populate("participants", "id name avatar email")
-            .populate("requestedBy", "id name avatar email")
             .sort({ createdAt: -1 })
             .limit(50);
+
+        // Sync participants for registration in Mongo
+        const participantIds = requests.flatMap(r => r.participants);
+        await syncMultipleUsersToMongo(participantIds);
+
+        const populatedRequests = await ChatModel.find({
+            _id: { $in: requests.map(r => r._id) }
+        })
+            .populate("participants", "id name avatar email")
+            .populate("requestedBy", "id name avatar email")
+            .sort({ createdAt: -1 });
 
         if (!requests || requests.length === 0) {
             return res.status(200).json({
@@ -30,7 +40,7 @@ export const getRequestedChats = async (req, res) => {
         return res.status(200).json({
             status: 200,
             message: "Chat requests fetched successfully",
-            data: requests,
+            data: populatedRequests,
         });
     } catch (error) {
         console.error("Chat request fetching error:", error);
@@ -56,11 +66,21 @@ export const getActiveChats = async (req, res) => {
             participants: userId,
             status: { $in: ["accepted", "auto_accepted"] },
         })
-            .populate("participants", "id name avatar email")
-            .populate("lastSenderId", "id name avatar")
             .sort({ lastMessageAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
+
+        // Ensure participants exist in Mongo for population
+        const allParticipantIds = chats.flatMap(c => c.participants);
+        chats.filter(c => c.lastSenderId).forEach(c => allParticipantIds.push(c.lastSenderId));
+        await syncMultipleUsersToMongo(allParticipantIds);
+
+        const populatedChats = await ChatModel.find({
+            _id: { $in: chats.map(c => c._id) }
+        })
+            .populate("participants", "id name avatar email")
+            .populate("lastSenderId", "id name avatar")
+            .sort({ lastMessageAt: -1 });
 
         const totalCount = await ChatModel.countDocuments({
             participants: userId,
@@ -114,9 +134,11 @@ export const getChatMessagesById = async (req, res) => {
 
         // Validate user has access to this chat
         const chat = await ChatModel.findOne({
-            _id: chatId,
+            _id: parseInt(chatId),
             participants: userId,
         });
+
+        console.log("Fetched chat:", chat);
 
         if (!chat) {
             return res.status(403).json({
@@ -127,17 +149,26 @@ export const getChatMessagesById = async (req, res) => {
 
         // Fetch messages
         const messages = await MessageModel.find({ chatId })
-            .populate("senderId", "id name avatar email")
-            .populate("receiverId", "id name avatar email")
-            .populate("replyTo")
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
 
+        // Sync users for messages
+        const messageUserIds = messages.flatMap(m => [m.senderId, m.receiverId]);
+        await syncMultipleUsersToMongo(messageUserIds);
+
+        const populatedMessages = await MessageModel.find({
+            _id: { $in: messages.map(m => m._id) }
+        })
+            .populate("senderId", "id name avatar email")
+            .populate("receiverId", "id name avatar email")
+            .populate("replyTo")
+            .sort({ createdAt: -1 });
+
         const totalCount = await MessageModel.countDocuments({ chatId });
 
         // Filter out deleted messages for this user
-        const filteredMessages = messages
+        const filteredMessages = populatedMessages
             .map((msg) => {
                 const messageObj = msg.toObject();
                 if (messageObj.deletedBy && messageObj.deletedBy.includes(userId)) {
@@ -219,12 +250,18 @@ export const createOrGetChat = async (req, res) => {
         });
 
         await chat.save();
-        await chat.populate("participants", "id name avatar email");
+
+        // Ensure participants exist in Mongo for population
+        await syncMultipleUsersToMongo([userId, recipientId]);
+
+        // Return populated chat
+        const populatedChat = await ChatModel.findById(chat._id)
+            .populate("participants", "id name avatar email");
 
         return res.status(201).json({
             status: 201,
             message: "Chat created successfully",
-            data: chat,
+            data: populatedChat,
         });
     } catch (error) {
         console.error("Error creating chat:", error);
@@ -448,9 +485,10 @@ export const getUserChatHistory = async (req, res) => {
         const { limit = 50, page = 1, includeArchived = false } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        const id = parseInt(userId);
         // Build query
         const query = {
-            participants: userId,
+            participants: id,
         };
 
         if (includeArchived === "false") {
@@ -459,17 +497,28 @@ export const getUserChatHistory = async (req, res) => {
 
         // Get all chats for the user
         const chats = await ChatModel.find(query)
-            .populate("participants", "id name avatar email")
-            .populate("lastSenderId", "id name avatar")
             .sort({ lastMessageAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
+
+        // Sync participants from MySQL to Mongo for population
+        const participantIds = chats.flatMap(c => c.participants);
+        chats.filter(c => c.lastSenderId).forEach(c => participantIds.push(c.lastSenderId));
+        await syncMultipleUsersToMongo(participantIds);
+
+        // Repopulate chats
+        const populatedChats = await ChatModel.find({
+            _id: { $in: chats.map(c => c._id) }
+        })
+            .populate("participants", "_id name avatar email")
+            .populate("lastSenderId", "_id name avatar")
+            .sort({ lastMessageAt: -1 });
 
         const totalCount = await ChatModel.countDocuments(query);
 
         // Get message statistics
         const stats = await Promise.all(
-            chats.map(async (chat) => {
+            populatedChats.map(async (chat) => {
                 const msgCount = await MessageModel.countDocuments({
                     chatId: chat._id,
                 });
@@ -480,7 +529,7 @@ export const getUserChatHistory = async (req, res) => {
             })
         );
 
-        const chatsWithStats = chats.map((chat) => {
+        const chatsWithStats = populatedChats.map((chat) => {
             const stat = stats.find((s) => s.chatId.toString() === chat._id.toString());
             return {
                 ...chat.toObject(),
@@ -520,9 +569,7 @@ export const getChatDetails = async (req, res) => {
         const chat = await ChatModel.findOne({
             _id: chatId,
             participants: userId,
-        })
-            .populate("participants", "id name avatar email status")
-            .populate("lastSenderId", "id name avatar");
+        });
 
         if (!chat) {
             return res.status(404).json({
@@ -531,13 +578,22 @@ export const getChatDetails = async (req, res) => {
             });
         }
 
+        // Sync participants
+        const participantIds = chat.participants;
+        if (chat.lastSenderId) participantIds.push(chat.lastSenderId);
+        await syncMultipleUsersToMongo(participantIds);
+
+        const populatedChat = await ChatModel.findById(chat._id)
+            .populate("participants", "id name avatar email status")
+            .populate("lastSenderId", "id name avatar");
+
         const messageCount = await MessageModel.countDocuments({ chatId });
 
         return res.status(200).json({
             status: 200,
             message: "Chat details retrieved",
             data: {
-                ...chat.toObject(),
+                ...populatedChat.toObject(),
                 messageCount,
             },
         });

@@ -1,15 +1,33 @@
 import mongoose from "mongoose";
 import { Schema } from "mongoose";
 
+const counterSchema = new Schema({
+    _id: { type: String, required: true },
+    seq: { type: Number, default: 0 }
+});
+
+const Counter = mongoose.model("Counter", counterSchema);
+
+const getNextId = async (name) => {
+    const counter = await Counter.findByIdAndUpdate(
+        name,
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+    return counter.seq;
+};
+
 /**
  * Chat Conversation Schema
  * Stores metadata about chat conversations between users
  */
 const chatSchema = new Schema(
     {
+        _id: { type: Number },
+
         participants: [
             {
-                type: Schema.Types.ObjectId,
+                type: Number,
                 ref: "User",
                 required: true,
             },
@@ -22,7 +40,7 @@ const chatSchema = new Schema(
         },
 
         requestedBy: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             ref: "User",
             required: true,
         },
@@ -49,7 +67,7 @@ const chatSchema = new Schema(
         },
 
         lastSenderId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             ref: "User",
         },
 
@@ -65,7 +83,7 @@ const chatSchema = new Schema(
         },
 
         blockedBy: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             ref: "User",
             default: null,
         },
@@ -80,27 +98,35 @@ const chatSchema = new Schema(
     }
 );
 
+chatSchema.pre("save", async function () {
+    if (this.isNew && !this._id) {
+        this._id = await getNextId("chatId");
+    }
+});
+
 /**
  * Message Schema
  * Stores individual chat messages with support for media
  */
 const messageSchema = new Schema(
     {
+        _id: { type: Number },
+
         chatId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             required: true,
             ref: "chat",
             index: true,
         },
 
         senderId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             required: true,
             ref: "User",
         },
 
         receiverId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             required: true,
             ref: "User",
         },
@@ -138,7 +164,7 @@ const messageSchema = new Schema(
         readBy: [
             {
                 userId: {
-                    type: Schema.Types.ObjectId,
+                    type: Number,
                     ref: "User",
                 },
                 readAt: {
@@ -150,13 +176,13 @@ const messageSchema = new Schema(
 
         deletedBy: [
             {
-                type: Schema.Types.ObjectId,
+                type: Number,
                 ref: "User",
             },
         ],
 
         replyTo: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             ref: "message",
             default: null,
         },
@@ -164,7 +190,7 @@ const messageSchema = new Schema(
         reactions: [
             {
                 userId: {
-                    type: Schema.Types.ObjectId,
+                    type: Number,
                     ref: "User",
                 },
                 emoji: String,
@@ -185,9 +211,27 @@ const messageSchema = new Schema(
     }
 );
 
+messageSchema.pre("save", async function () {
+    if (this.isNew && !this._id) {
+        this._id = await getNextId("messageId");
+    }
+});
+
+/**
+ * User Schema (Minimal for MongoDB to support populate)
+ * The main user data is in MySQL, this stores a copy for chat performance
+ */
+const userSchema = new Schema(
+    {
+        _id: { type: Number },
+        name: { type: String, required: true },
+        avatar: { type: String },
+        email: { type: String },
+    },
+    { timestamps: true }
+);
+
+export const UserModel = mongoose.model("User", userSchema);
 export const ChatModel = mongoose.model("chat", chatSchema);
 export const MessageModel = mongoose.model("message", messageSchema);
-
-// Keep old exports for backward compatibility
-// export const chatSchema = ChatModel;
-// export const messageSchema = MessageModel;
+export const CounterModel = Counter;

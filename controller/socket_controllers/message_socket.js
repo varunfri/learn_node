@@ -1,4 +1,5 @@
 import { ChatModel, MessageModel } from "../../db_config/mongo_schemas/chat_schema.js";
+import { syncUserToMongo } from "../../utils/mongo_sync.js";
 
 /**
  * Real-time messaging socket handlers
@@ -15,9 +16,10 @@ export const messageSocketHandlers = (io, socket) => {
      */
     socket.on("join_chat", async ({ chatId }) => {
         try {
+            const id = parseInt(chatId);
             // Validate chat access
             const chat = await ChatModel.findOne({
-                _id: chatId,
+                _id: id,
                 participants: userId,
             });
 
@@ -57,7 +59,8 @@ export const messageSocketHandlers = (io, socket) => {
      */
     socket.on("leave_chat", ({ chatId }) => {
         try {
-            const roomName = `chat_${chatId}`;
+            const id = parseInt(chatId);
+            const roomName = `chat_${id}`;
             socket.leave(roomName);
 
             socket.to(roomName).emit("user_offline", {
@@ -85,9 +88,10 @@ export const messageSocketHandlers = (io, socket) => {
                 return;
             }
 
+            const id = parseInt(chatId);
             // Validate chat access
             const chat = await ChatModel.findOne({
-                _id: chatId,
+                _id: id,
                 participants: userId,
                 status: { $in: ["accepted", "auto_accepted"] },
             });
@@ -111,6 +115,9 @@ export const messageSocketHandlers = (io, socket) => {
             });
 
             await newMessage.save();
+
+            // Sync user for population
+            await syncUserToMongo(userId);
 
             // Populate sender info
             await newMessage.populate("senderId", "name avatar");
@@ -259,9 +266,12 @@ export const messageSocketHandlers = (io, socket) => {
                 return;
             }
 
+            const ids = messageIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+            const cId = parseInt(chatId);
+
             // Update read status for messages
             await MessageModel.updateMany(
-                { _id: { $in: messageIds } },
+                { _id: { $in: ids } },
                 {
                     $push: {
                         readBy: {
@@ -302,10 +312,11 @@ export const messageSocketHandlers = (io, socket) => {
      */
     socket.on("typing", ({ chatId }) => {
         try {
-            const roomName = `chat_${chatId}`;
+            const id = parseInt(chatId);
+            const roomName = `chat_${id}`;
             socket.to(roomName).emit("user_typing", {
                 userId,
-                chatId,
+                chatId: id,
                 timestamp: new Date(),
             });
         } catch (error) {
@@ -320,10 +331,11 @@ export const messageSocketHandlers = (io, socket) => {
      */
     socket.on("stop_typing", ({ chatId }) => {
         try {
-            const roomName = `chat_${chatId}`;
+            const id = parseInt(chatId);
+            const roomName = `chat_${id}`;
             socket.to(roomName).emit("user_stop_typing", {
                 userId,
-                chatId,
+                chatId: id,
                 timestamp: new Date(),
             });
         } catch (error) {
@@ -343,7 +355,9 @@ export const messageSocketHandlers = (io, socket) => {
                 return;
             }
 
-            const message = await MessageModel.findById(messageId);
+            const mId = parseInt(messageId);
+            const id = parseInt(chatId);
+            const message = await MessageModel.findById(mId);
             if (!message || message.senderId.toString() !== userId.toString()) {
                 socket.emit("error", { message: "Cannot edit this message" });
                 return;
@@ -355,10 +369,10 @@ export const messageSocketHandlers = (io, socket) => {
             await message.save();
 
             // Emit to room
-            const roomName = `chat_${chatId}`;
+            const roomName = `chat_${id}`;
             io.to(roomName).emit("message_edited", {
-                messageId,
-                chatId,
+                messageId: mId,
+                chatId: id,
                 newContent: message.content,
                 editedAt: message.editedAt,
                 editedBy: userId,
@@ -378,7 +392,9 @@ export const messageSocketHandlers = (io, socket) => {
      */
     socket.on("delete_message", async ({ messageId, chatId }) => {
         try {
-            const message = await MessageModel.findById(messageId);
+            const mId = parseInt(messageId);
+            const id = parseInt(chatId);
+            const message = await MessageModel.findById(mId);
             if (!message || message.senderId.toString() !== userId.toString()) {
                 socket.emit("error", { message: "Cannot delete this message" });
                 return;
@@ -391,14 +407,14 @@ export const messageSocketHandlers = (io, socket) => {
             }
 
             // Emit to room
-            const roomName = `chat_${chatId}`;
+            const roomName = `chat_${id}`;
             io.to(roomName).emit("message_deleted", {
-                messageId,
-                chatId,
+                messageId: mId,
+                chatId: id,
                 deletedBy: userId,
             });
 
-            socket.emit("delete_success", { messageId });
+            socket.emit("delete_success", { messageId: mId });
         } catch (error) {
             console.error("Error deleting message:", error);
             socket.emit("error", { message: "Failed to delete message" });

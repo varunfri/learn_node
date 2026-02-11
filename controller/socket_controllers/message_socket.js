@@ -89,7 +89,7 @@ export const messageSocketHandlers = (io, socket) => {
             const chat = await ChatModel.findOne({
                 _id: chatId,
                 participants: userId,
-                status: { $in: ["accepted", "auto_accepted"] },
+                status: { $in: ["accepted", "auto_accepted", "pending"] },
             });
 
             if (!chat) {
@@ -112,9 +112,11 @@ export const messageSocketHandlers = (io, socket) => {
 
             await newMessage.save();
 
-            // Populate sender info
-            await newMessage.populate("senderId", "name avatar");
-            await newMessage.populate("replyTo");
+            // Auto-accept pending chats on first message
+            if (chat.status === "pending") {
+                chat.status = "auto_accepted";
+                chat.acceptedAt = new Date();
+            }
 
             // Update chat metadata
             chat.lastMessage = content.substring(0, 50);
@@ -175,7 +177,7 @@ export const messageSocketHandlers = (io, socket) => {
             const chat = await ChatModel.findOne({
                 _id: chatId,
                 participants: userId,
-                status: { $in: ["accepted", "auto_accepted"] },
+                status: { $in: ["accepted", "auto_accepted", "pending"] },
             });
 
             if (!chat) {
@@ -203,7 +205,6 @@ export const messageSocketHandlers = (io, socket) => {
             });
 
             await newMessage.save();
-            await newMessage.populate("senderId", "name avatar");
 
             // Update chat metadata
             chat.lastMessage = `[${messageType.toUpperCase()}]`;

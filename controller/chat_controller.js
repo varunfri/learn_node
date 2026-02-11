@@ -1,5 +1,128 @@
 import mongoose from "mongoose";
 import { ChatModel, MessageModel } from "../db_config/mongo_schemas/chat_schema.js";
+import { mysql_db } from "../db_config/mysql_connect.js";
+
+/**
+ * Helper to fetch user details from MySQL
+ * Returns a Map of userId -> userObject
+ */
+const getUsersFromMySQL = async (userIds) => {
+    if (!userIds || userIds.size === 0) return new Map();
+
+    try {
+        // Convert Set to Array
+        const idsArray = Array.from(userIds);
+        if (idsArray.length === 0) return new Map();
+
+        const [rows] = await mysql_db.query(
+            `SELECT user_id, full_name, email, profile_picture FROM users WHERE user_id IN (?)`,
+            [idsArray]
+        );
+
+        const userMap = new Map();
+        rows.forEach((row) => {
+            userMap.set(row.user_id, {
+                id: row.user_id,
+                name: row.full_name,
+                email: row.email,
+                avatar: row.profile_picture, // Map profile_picture to avatar for frontend compatibility
+            });
+        });
+
+        return userMap;
+    } catch (error) {
+        console.error("Error fetching users from MySQL:", error);
+        return new Map();
+    }
+};
+
+/**
+ * Helper to enrich chat objects with user data
+ */
+const enrichChatsWithUserData = async (chats) => {
+    if (!chats || chats.length === 0) return [];
+
+    const userIds = new Set();
+    const chatObjects = chats.map((chat) => (chat.toObject ? chat.toObject() : chat));
+
+    chatObjects.forEach((chat) => {
+        if (Array.isArray(chat.participants)) {
+            chat.participants.forEach((p) => {
+                // p might be an object if checking types, but schema says Number
+                if (typeof p === "number") userIds.add(p);
+                else if (p && p.id) userIds.add(p.id); // safeguards
+            });
+        }
+        if (chat.requestedBy) userIds.add(chat.requestedBy);
+        if (chat.lastSenderId) userIds.add(chat.lastSenderId);
+        if (chat.blockedBy) userIds.add(chat.blockedBy);
+    });
+
+    const userMap = await getUsersFromMySQL(userIds);
+
+    const unknownUser = { id: 0, name: "Unknown User", email: "", avatar: null };
+
+    return chatObjects.map((chat) => {
+        // Enrich participants
+        chat.participants = chat.participants.map((pId) => {
+            const id = typeof pId === "object" ? pId : pId; // Handle if already object (shouldn't be)
+            return userMap.get(id) || { ...unknownUser, id };
+        });
+
+        // Enrich requestedBy
+        if (chat.requestedBy) {
+            chat.requestedBy = userMap.get(chat.requestedBy) || { ...unknownUser, id: chat.requestedBy };
+        }
+
+        // Enrich lastSenderId
+        if (chat.lastSenderId) {
+            chat.lastSenderId = userMap.get(chat.lastSenderId) || { ...unknownUser, id: chat.lastSenderId };
+        }
+
+        // Enrich blockedBy
+        if (chat.blockedBy) {
+            chat.blockedBy = userMap.get(chat.blockedBy) || { ...unknownUser, id: chat.blockedBy };
+        }
+
+        return chat;
+    });
+};
+
+/**
+ * Helper to enrich message objects with user data
+ */
+const enrichMessagesWithUserData = async (messages) => {
+    if (!messages || messages.length === 0) return [];
+
+    const userIds = new Set();
+    const messageObjects = messages.map((msg) => (msg.toObject ? msg.toObject() : msg));
+
+    messageObjects.forEach((msg) => {
+        if (msg.senderId) userIds.add(msg.senderId);
+        if (msg.receiverId) userIds.add(msg.receiverId);
+        if (msg.readBy) {
+            msg.readBy.forEach((r) => {
+                if (r.userId) userIds.add(r.userId);
+            });
+        }
+        // Reactions, deletedBy, etc. could also be enriched if needed
+    });
+
+    const userMap = await getUsersFromMySQL(userIds);
+    const unknownUser = { id: 0, name: "Unknown User", email: "", avatar: null };
+
+    return messageObjects.map((msg) => {
+        if (msg.senderId) {
+            msg.senderId = userMap.get(msg.senderId) || { ...unknownUser, id: msg.senderId };
+        }
+        if (msg.receiverId) {
+            msg.receiverId = userMap.get(msg.receiverId) || { ...unknownUser, id: msg.receiverId };
+        }
+        // You might want to enrich readBy, etc. if frontend uses it
+        // For now, keeping it simple as main UI uses sender/receiver
+        return msg;
+    });
+};
 
 /**
  * Get chat requests (pending chats)
@@ -14,8 +137,6 @@ export const getRequestedChats = async (req, res) => {
             status: "pending",
             requestedBy: { $ne: userId },
         })
-            .populate("participants", "id name avatar email")
-            .populate("requestedBy", "id name avatar email")
             .sort({ createdAt: -1 })
             .limit(50);
 
@@ -27,10 +148,12 @@ export const getRequestedChats = async (req, res) => {
             });
         }
 
+        const enrichedRequests = await enrichChatsWithUserData(requests);
+
         return res.status(200).json({
             status: 200,
             message: "Chat requests fetched successfully",
-            data: requests,
+            data: enrichedRequests,
         });
     } catch (error) {
         console.error("Chat request fetching error:", error);
@@ -56,8 +179,6 @@ export const getActiveChats = async (req, res) => {
             participants: userId,
             status: { $in: ["accepted", "auto_accepted"] },
         })
-            .populate("participants", "id name avatar email")
-            .populate("lastSenderId", "id name avatar")
             .sort({ lastMessageAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
@@ -80,10 +201,12 @@ export const getActiveChats = async (req, res) => {
             });
         }
 
+        const enrichedChats = await enrichChatsWithUserData(chats);
+
         return res.status(200).json({
             status: 200,
             message: "Active chats found",
-            data: chats,
+            data: enrichedChats,
             pagination: {
                 total: totalCount,
                 page: parseInt(page),
@@ -127,24 +250,23 @@ export const getChatMessagesById = async (req, res) => {
 
         // Fetch messages
         const messages = await MessageModel.find({ chatId })
-            .populate("senderId", "id name avatar email")
-            .populate("receiverId", "id name avatar email")
-            .populate("replyTo")
+            .populate("replyTo") // internal ref to message, valid in Mongo
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
 
         const totalCount = await MessageModel.countDocuments({ chatId });
 
+        const enrichedMessages = await enrichMessagesWithUserData(messages);
+
         // Filter out deleted messages for this user
-        const filteredMessages = messages
+        const filteredMessages = enrichedMessages
             .map((msg) => {
-                const messageObj = msg.toObject();
-                if (messageObj.deletedBy && messageObj.deletedBy.includes(userId)) {
-                    messageObj.content = "[This message was deleted]";
-                    messageObj.media = null;
+                if (msg.deletedBy && msg.deletedBy.includes(userId)) {
+                    msg.content = "[This message was deleted]";
+                    msg.media = null;
                 }
-                return messageObj;
+                return msg;
             })
             .reverse(); // Reverse to get chronological order
 
@@ -155,7 +277,7 @@ export const getChatMessagesById = async (req, res) => {
             chatInfo: {
                 chatId: chat._id,
                 status: chat.status,
-                participants: chat.participants,
+                participants: chat.participants, // Note: these are raw IDs here, usually messages endpoint doesn't return full chat info participants
             },
             pagination: {
                 total: totalCount,
@@ -190,7 +312,10 @@ export const createOrGetChat = async (req, res) => {
             });
         }
 
-        if (userId === recipientId) {
+        // recipientId might be string from JSON, convert to number
+        const recipientIdNum = Number(recipientId);
+
+        if (userId === recipientIdNum) {
             return res.status(400).json({
                 status: 400,
                 message: "Cannot create chat with yourself",
@@ -199,32 +324,35 @@ export const createOrGetChat = async (req, res) => {
 
         // Check if chat already exists
         let chat = await ChatModel.findOne({
-            participants: { $all: [userId, recipientId] },
-        }).populate("participants", "id name avatar email");
+            participants: { $all: [userId, recipientIdNum] },
+        });
 
         if (chat) {
+            const enrichedChat = (await enrichChatsWithUserData([chat]))[0];
             return res.status(200).json({
                 status: 200,
                 message: "Chat already exists",
-                data: chat,
+                data: enrichedChat,
             });
         }
 
         // Create new chat
         chat = new ChatModel({
-            participants: [userId, recipientId],
-            status: "pending",
+            participants: [userId, recipientIdNum],
+            status: "auto_accepted",
             requestedBy: userId,
+            acceptedAt: new Date(),
             unreadCount: new Map(),
         });
 
         await chat.save();
-        await chat.populate("participants", "id name avatar email");
+
+        const enrichedChat = (await enrichChatsWithUserData([chat]))[0];
 
         return res.status(201).json({
             status: 201,
             message: "Chat created successfully",
-            data: chat,
+            data: enrichedChat,
         });
     } catch (error) {
         console.error("Error creating chat:", error);
@@ -263,12 +391,12 @@ export const acceptChatRequest = async (req, res) => {
         chat.acceptedAt = new Date();
         await chat.save();
 
-        await chat.populate("participants", "id name avatar email");
+        const enrichedChat = (await enrichChatsWithUserData([chat]))[0];
 
         return res.status(200).json({
             status: 200,
             message: "Chat request accepted",
-            data: chat,
+            data: enrichedChat,
         });
     } catch (error) {
         console.error("Error accepting chat:", error);
@@ -329,6 +457,7 @@ export const blockUser = async (req, res) => {
         const userId = req.user.id;
         const { chatId } = req.params;
 
+        // Find chat where user is a participant
         const chat = await ChatModel.findOne({
             _id: chatId,
             participants: userId,
@@ -450,7 +579,7 @@ export const getUserChatHistory = async (req, res) => {
 
         // Build query
         const query = {
-            participants: userId,
+            participants: Number(userId),
         };
 
         if (includeArchived === "false") {
@@ -459,8 +588,6 @@ export const getUserChatHistory = async (req, res) => {
 
         // Get all chats for the user
         const chats = await ChatModel.find(query)
-            .populate("participants", "id name avatar email")
-            .populate("lastSenderId", "id name avatar")
             .sort({ lastMessageAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
@@ -480,10 +607,12 @@ export const getUserChatHistory = async (req, res) => {
             })
         );
 
-        const chatsWithStats = chats.map((chat) => {
+        const enrichedChats = await enrichChatsWithUserData(chats);
+
+        const chatsWithStats = enrichedChats.map((chat) => {
             const stat = stats.find((s) => s.chatId.toString() === chat._id.toString());
             return {
-                ...chat.toObject(),
+                ...chat,
                 messageCount: stat?.messageCount || 0,
             };
         });
@@ -520,9 +649,7 @@ export const getChatDetails = async (req, res) => {
         const chat = await ChatModel.findOne({
             _id: chatId,
             participants: userId,
-        })
-            .populate("participants", "id name avatar email status")
-            .populate("lastSenderId", "id name avatar");
+        });
 
         if (!chat) {
             return res.status(404).json({
@@ -531,13 +658,14 @@ export const getChatDetails = async (req, res) => {
             });
         }
 
+        const enrichedChat = (await enrichChatsWithUserData([chat]))[0];
         const messageCount = await MessageModel.countDocuments({ chatId });
 
         return res.status(200).json({
             status: 200,
             message: "Chat details retrieved",
             data: {
-                ...chat.toObject(),
+                ...enrichedChat,
                 messageCount,
             },
         });
@@ -629,7 +757,6 @@ export const searchChatMessages = async (req, res) => {
             chatId,
             $or: [{ content: { $regex: q, $options: "i" } }, { "media.fileName": { $regex: q, $options: "i" } }],
         })
-            .populate("senderId", "id name avatar")
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
             .skip(skip);
@@ -639,10 +766,12 @@ export const searchChatMessages = async (req, res) => {
             $or: [{ content: { $regex: q, $options: "i" } }, { "media.fileName": { $regex: q, $options: "i" } }],
         });
 
+        const enrichedMessages = await enrichMessagesWithUserData(messages);
+
         return res.status(200).json({
             status: 200,
             message: "Messages found",
-            data: messages,
+            data: enrichedMessages,
             pagination: {
                 total: totalCount,
                 page: parseInt(page),
@@ -651,6 +780,88 @@ export const searchChatMessages = async (req, res) => {
         });
     } catch (error) {
         console.error("Error searching messages:", error);
+        return res.status(500).json({
+            status: 500,
+            message: "Internal server error",
+            error: error.message,
+        });
+    }
+};
+
+/**
+ * Send a message to a chat (REST endpoint)
+ * POST /chats/:chatId/messages
+ * Body: { content }
+ */
+export const sendMessageToChat = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { chatId } = req.params;
+        const { content } = req.body;
+
+        if (!content || !content.trim()) {
+            return res.status(400).json({
+                status: 400,
+                message: "Message content cannot be empty",
+            });
+        }
+
+        // Validate chat access and status
+        const chat = await ChatModel.findOne({
+            _id: chatId,
+            participants: userId,
+            status: { $in: ["accepted", "auto_accepted", "pending"] },
+        });
+
+        if (!chat) {
+            return res.status(403).json({
+                status: 403,
+                message: "Cannot send message to this chat",
+            });
+        }
+
+        // Auto-accept pending chats on first message
+        if (chat.status === "pending") {
+            chat.status = "auto_accepted";
+            chat.acceptedAt = new Date();
+        }
+
+        // Find receiver
+        const receiverId = chat.participants.find((id) => id !== userId);
+
+        // Create message
+        const newMessage = new MessageModel({
+            chatId,
+            senderId: userId,
+            receiverId,
+            content: content.trim(),
+            messageType: "text",
+        });
+
+        await newMessage.save();
+
+        // Update chat metadata
+        chat.lastMessage = content.substring(0, 50);
+        chat.lastMessageAt = newMessage.createdAt;
+        chat.lastMessageType = "text";
+        chat.lastSenderId = userId;
+
+        // Increment unread count for receiver
+        const unreadCount = chat.unreadCount.get(receiverId.toString()) || 0;
+        chat.unreadCount.set(receiverId.toString(), unreadCount + 1);
+
+        await chat.save();
+
+        // Convert to plain object for response
+        const messageObj = newMessage.toObject();
+
+        return res.status(201).json({
+            status: 201,
+            message: "Message sent successfully",
+            data: messageObj,
+        });
+    } catch (error) {
+        console.error("Error sending message:", error);
         return res.status(500).json({
             status: 500,
             message: "Internal server error",

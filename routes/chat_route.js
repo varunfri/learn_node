@@ -13,6 +13,7 @@ import {
     getChatDetails,
     deleteChat,
     searchChatMessages,
+    sendMessageToChat,
 } from "../controller/chat_controller.js";
 import { authorize } from "../middleware/auth_middleware.js";
 
@@ -31,6 +32,7 @@ router.post("/:chatId/reject", authorize, rejectChatRequest);
  * Chat Message Operations
  */
 router.get("/:chatId/messages", authorize, getChatMessagesById);
+router.post("/:chatId/messages", authorize, sendMessageToChat);
 router.get("/:chatId/search", authorize, searchChatMessages);
 
 /**

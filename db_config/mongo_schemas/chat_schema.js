@@ -9,8 +9,7 @@ const chatSchema = new Schema(
     {
         participants: [
             {
-                type: Schema.Types.ObjectId,
-                ref: "User",
+                type: Number,
                 required: true,
             },
         ],
@@ -22,8 +21,7 @@ const chatSchema = new Schema(
         },
 
         requestedBy: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
+            type: Number,
             required: true,
         },
 
@@ -49,8 +47,7 @@ const chatSchema = new Schema(
         },
 
         lastSenderId: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
+            type: Number,
         },
 
         unreadCount: {
@@ -65,8 +62,7 @@ const chatSchema = new Schema(
         },
 
         blockedBy: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
+            type: Number,
             default: null,
         },
     },
@@ -94,15 +90,13 @@ const messageSchema = new Schema(
         },
 
         senderId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             required: true,
-            ref: "User",
         },
 
         receiverId: {
-            type: Schema.Types.ObjectId,
+            type: Number,
             required: true,
-            ref: "User",
         },
 
         content: {
@@ -138,8 +132,7 @@ const messageSchema = new Schema(
         readBy: [
             {
                 userId: {
-                    type: Schema.Types.ObjectId,
-                    ref: "User",
+                    type: Number,
                 },
                 readAt: {
                     type: Date,
@@ -150,8 +143,7 @@ const messageSchema = new Schema(
 
         deletedBy: [
             {
-                type: Schema.Types.ObjectId,
-                ref: "User",
+                type: Number,
             },
         ],
 
@@ -164,8 +156,7 @@ const messageSchema = new Schema(
         reactions: [
             {
                 userId: {
-                    type: Schema.Types.ObjectId,
-                    ref: "User",
+                    type: Number,
                 },
                 emoji: String,
                 createdAt: {

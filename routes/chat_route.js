@@ -47,6 +47,6 @@ router.delete("/:chatId", authorize, deleteChat);
 /**
  * Chat History
  */
-router.get("/user/:userId/history", getUserChatHistory);
+router.get("/user/:userId/history", authorize, getUserChatHistory);
 
 export default router;

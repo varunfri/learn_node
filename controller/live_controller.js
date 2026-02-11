@@ -314,9 +314,10 @@ export const end_live = async (req, res) => {
 };
 
 export const get_video_lives = async (req, res) => {
+    const id = req.user.id;
     try {
         const [result] = await mysql_db.query(
-            `SELECT
+            ` SELECT
             u.user_id,
             u.full_name,
             COALESCE(un.username, '') AS username,
@@ -355,10 +356,11 @@ export const get_video_lives = async (req, res) => {
             ON ug.receiver_id = u.user_id
         WHERE us.is_live = 1
         AND us.is_audio = 0
+        AND us.user_id <> ?
         ORDER BY
             COALESCE(uvl.vip_level_id, 0) DESC,
             us.started_at DESC;
-        `);
+        `,[id] );
 
 
 

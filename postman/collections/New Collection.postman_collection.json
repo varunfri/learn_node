@@ -276,12 +276,12 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{jwt_token}}",
+                    "value": "{{jwt_token}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/chats/active?limit=10&page=1",
+                  "raw": "{{base_url}}/api/chats/active?limit=20&page=1",
                   "host": [
                     "{{base_url}}"
                   ],
@@ -293,11 +293,13 @@
                   "query": [
                     {
                       "key": "limit",
-                      "value": "10"
+                      "value": "20",
+                      "uuid": "c3f25c4a-9afa-4c3f-9a27-75bdcf62bc28"
                     },
                     {
                       "key": "page",
-                      "value": "1"
+                      "value": "1",
+                      "uuid": "35313d80-f4c1-4f8c-839a-20205d13dcfe"
                     }
                   ]
                 },
@@ -313,29 +315,37 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{jwt_token}}",
+                    "value": "{{jwt_token}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/chats/{{chatId}}/messages?limit=20&page=1",
+                  "raw": "{{base_url}}/api/chats/:chatId/messages?limit=20&page=1",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "api",
                     "chats",
-                    "{{chatId}}",
+                    ":chatId",
                     "messages"
                   ],
                   "query": [
                     {
                       "key": "limit",
-                      "value": "20"
+                      "value": "20",
+                      "uuid": "8a463265-515f-4fea-a6a4-11a7af6caff5"
                     },
                     {
                       "key": "page",
-                      "value": "1"
+                      "value": "1",
+                      "uuid": "b56286ba-95f9-45c2-835d-940e80262c7e"
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "chatId",
+                      "value": "4"
                     }
                   ]
                 },
@@ -389,12 +399,12 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{jwt_token}}",
+                    "value": "{{jwt_token}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/chats/user/{{userId}}/history?includeArchived=false",
+                  "raw": "{{base_url}}/api/chats/user/:userId/history?includeArchived=false",
                   "host": [
                     "{{base_url}}"
                   ],
@@ -402,13 +412,20 @@
                     "api",
                     "chats",
                     "user",
-                    "{{userId}}",
+                    ":userId",
                     "history"
                   ],
                   "query": [
                     {
                       "key": "includeArchived",
-                      "value": "false"
+                      "value": "false",
+                      "uuid": "ebdb76ec-567e-4ef5-93a8-42b27e5dbf5f"
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "userId",
+                      "value": "3"
                     }
                   ]
                 },
@@ -430,19 +447,26 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{jwt_token}}",
+                    "value": "{{jwt_token}}",
                     "type": "text"
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/chats/{{chatId}}",
+                  "raw": "{{base_url}}/api/chats/:chatId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "api",
                     "chats",
-                    "{{chatId}}"
+                    ":chatId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "chatId",
+                      "value": "4",
+                      "uuid": "012bb183-45f2-426e-8e7f-c7ed800a3a04"
+                    }
                   ]
                 },
                 "description": "Get detailed information about a chat"
@@ -1270,7 +1294,7 @@
       "id": "user-folder"
     },
     {
-      "name": "User Coins",
+      "name": "User Coins Management",
       "item": [
         {
           "name": "Get Coin Balance",
@@ -1285,13 +1309,13 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/coins/get_coins",
+              "raw": "{{base_url}}/api/user_coins/get_coins",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
-                "coins",
+                "user_coins",
                 "get_coins"
               ]
             },
@@ -1369,7 +1393,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{jwt_token}}",
+                "value": "{{jwt_token}}",
                 "type": "text"
               },
               {
@@ -1383,13 +1407,13 @@
               "raw": "{\n  \"amount\": 100,\n  \"coins\": 1000\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/coins/purchase_coins",
+              "raw": "{{base_url}}/api/user_coins/purchase_coins",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
-                "coins",
+                "user_coins",
                 "purchase_coins"
               ]
             },

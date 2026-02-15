@@ -464,8 +464,7 @@
                   "variable": [
                     {
                       "key": "chatId",
-                      "value": "4",
-                      "uuid": "012bb183-45f2-426e-8e7f-c7ed800a3a04"
+                      "value": "4"
                     }
                   ]
                 },
@@ -4665,6 +4664,411 @@
       "id": "a5b21450-16dc-4e8a-ba7f-a53d727d9124"
     },
     {
+      "name": "Agency Management",
+      "item": [
+        {
+          "name": "Get All Active Agencies",
+          "id": "f2a68ad8-3e16-41e4-922c-faea888bff61",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agency/all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                "all"
+              ]
+            },
+            "description": "List all active agencies available on the platform."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Agency Details",
+          "id": "1a7c3ddc-1ced-4378-8e16-db79fb808841",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/agency/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Agency",
+          "id": "73a420e4-1c88-4ed9-9c7d-c961be03378d",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Global Talents Agency\",\n  \"description\": \"The best agency for streamers\",\n  \"contact_phone\": \"+123456789\",\n  \"official_email\": \"contact@globaltalents.com\",\n  \"commission_percentage\": 10.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/agency/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Agency Members",
+          "id": "0716f481-7f11-42a5-9191-e7fe61ad3d63",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/agency/:id/members",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                ":id",
+                "members"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Agency Earnings",
+          "id": "39ab5b73-c63c-4c57-8a22-71354a136276",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/agency/:id/earnings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                ":id",
+                "earnings"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send/Request Join Agency",
+          "id": "0039f3c6-6d01-4830-a88e-8ed48440c03e",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agency_id\": 1,\n  \"user_id\": 5,\n  \"sender_type\": \"AGENCY\",\n  \"message\": \"We want you to join our family!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/agency/request/send",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                "request",
+                "send"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Referral Code",
+          "id": "f8c736dd-e009-4f6a-adc4-aa4f1a948292",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"days_valid\": 7,\n  \"max_uses\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/agency/invite/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                "invite",
+                "generate"
+              ]
+            },
+            "description": "Owner generates a referral code with expiry and use limit."
+          },
+          "response": []
+        },
+        {
+          "name": "Join Agency with Code",
+          "id": "59fe39f5-66e9-4cc9-8b39-47bb6467c42c",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"H7K2P9X1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/agency/invite/join",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "agency",
+                "invite",
+                "join"
+              ]
+            },
+            "description": "Streamer joins an agency using a referral code."
+          },
+          "response": []
+        }
+      ],
+      "id": "18b073cf-bc86-4343-afa7-3420186957e8"
+    },
+    {
+      "name": "Coin Reseller System",
+      "item": [
+        {
+          "name": "Reseller Profile",
+          "id": "435c0414-71b6-4199-af91-c5b7d3b94c09",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reseller/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reseller",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer Coins to User",
+          "id": "b6cd8ea1-8232-4ad8-b1af-d6f1ac946667",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiver_id\": 10,\n  \"amount\": 5000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reseller/transfer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reseller",
+                "transfer"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer History",
+          "id": "7b75c902-2990-4773-b23e-e61c2248ea45",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reseller/history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reseller",
+                "history"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: Add Stock to Reseller",
+          "id": "17305be3-82c3-42b0-8261-caa323fb3870",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reseller_id\": 3,\n  \"amount\": 100000,\n  \"payment_method\": \"Bank Transfer\",\n  \"notes\": \"Bulk recharge for Feb\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reseller/admin/add-stock",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reseller",
+                "admin",
+                "add-stock"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin: All Reseller Stats",
+          "id": "9f2cdf57-2b29-43cb-9682-8c8a9494dd63",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reseller/admin/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reseller",
+                "admin",
+                "stats"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "c7efbaa2-6204-4324-8c37-318bcbe75ed3"
+    },
+    {
       "name": "New Request",
       "id": "d552b291-531e-48e3-9e5d-7b53799e8fed",
       "request": {
@@ -4684,50 +5088,6 @@
         }
       },
       "response": []
-    }
-  ],
-  "variable": [
-    {
-      "id": "e21438a1-65db-467c-a450-72be70d5cb34",
-      "key": "base_url",
-      "value": "http://localhost:8000",
-      "type": "string"
-    },
-    {
-      "id": "f3880e81-b58c-4192-927f-f94da8a817e4",
-      "key": "id_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "id": "46929b6a-dc05-429c-8242-010ffc1bab49",
-      "key": "refresh_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "id": "3d15f966-55e6-4467-bac6-c6cc642952d3",
-      "key": "jwt_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "id": "42a597d7-9f2b-45fa-8141-d5cecb3b9233",
-      "key": "chatId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "id": "96093d59-9776-418f-b740-6ed78ed58ed3",
-      "key": "userId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "id": "b5ddef95-b98b-4600-930b-c741abcfaa81",
-      "key": "fileId",
-      "value": "",
-      "type": "string"
     }
   ]
 }

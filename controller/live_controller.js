@@ -31,9 +31,9 @@ export const go_live = async (req, res) => {
 
         if (existing.length === 0) {
             const [insert] = await connection.query(
-                `INSERT INTO user_streams
-             (user_id, is_audio, status, started_at)
-             VALUES (?, ?, 'live', NOW())`,
+                `INSERT INTO user_streams 
+                 (user_id, is_audio, status, is_live, started_at) 
+                 VALUES (?, ?, 'live', 1, NOW())`,
                 [user_id, is_audio ? 1 : 0]
             );
 
@@ -57,8 +57,8 @@ export const go_live = async (req, res) => {
 
             await connection.query(
                 `UPDATE user_streams
-             SET status = 'live'
-             WHERE stream_id = ?`,
+                 SET status = 'live'
+                 WHERE stream_id = ?`,
                 [stream_id]
             );
         }
@@ -129,7 +129,7 @@ export const pause_live = async (req, res) => {
         // Update stream to paused
         const [updateResult] = await connection.query(
             `UPDATE user_streams 
-             SET is_paused = 1, paused_at = NOW() 
+             SET status = 'paused', is_paused = 1, paused_at = NOW() 
              WHERE stream_id = ?`,
             [stream_id]
         );
@@ -201,7 +201,7 @@ export const resume_live = async (req, res) => {
         // Update stream to resumed
         const [updateResult] = await connection.query(
             `UPDATE user_streams 
-             SET is_paused = 0, paused_at = NULL 
+             SET status = 'live', is_paused = 0, paused_at = NULL 
              WHERE stream_id = ?`,
             [stream_id]
         );
@@ -273,7 +273,7 @@ export const end_live = async (req, res) => {
         // Update stream to ended
         const [updateResult] = await connection.query(
             `UPDATE user_streams 
-             SET status = 'end', is_paused = 0, ended_at = NOW() 
+             SET status = 'end', is_live = 0, is_paused = 0, ended_at = NOW() 
              WHERE stream_id = ?`,
             [stream_id]
         );
@@ -355,12 +355,13 @@ export const get_video_lives = async (req, res) => {
         ) ug
             ON ug.receiver_id = u.user_id
         WHERE us.is_live = 1
+        AND us.is_paused = 0 
         AND us.is_audio = 0
         AND us.user_id <> ?
         ORDER BY
             COALESCE(uvl.vip_level_id, 0) DESC,
             us.started_at DESC;
-        `,[id] );
+        `, [id]);
 
 
 

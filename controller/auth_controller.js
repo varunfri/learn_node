@@ -116,7 +116,7 @@ export const sign_up = async (req, res) => {
         county,
         post_code
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [userId, country, country_code, state, state_district, county, post_code]
+            [userId, country || '', country_code || '', state || '', state_district || '', county || '', post_code || '']
         );
 
         // user_roles

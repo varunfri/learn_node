@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { ChatModel, MessageModel } from "../db_config/mongo_schemas/chat_schema.js";
 import { mysql_db } from "../db_config/mysql_connect.js";
+import { getIO } from "../utils/init_socket.js";
 
 /**
  * Helper to fetch user details from MySQL
@@ -11,7 +12,7 @@ const getUsersFromMySQL = async (userIds) => {
 
     try {
         // Convert Set to Array
-        const idsArray = Array.from(userIds);
+        const idsArray = Array.from(userIds).map(Number);
         if (idsArray.length === 0) return new Map();
 
         const [rows] = await mysql_db.query(
@@ -21,11 +22,12 @@ const getUsersFromMySQL = async (userIds) => {
 
         const userMap = new Map();
         rows.forEach((row) => {
-            userMap.set(row.user_id, {
-                id: row.user_id,
+            const uid = Number(row.user_id); // Ensure consistent Number type (not BigInt)
+            userMap.set(uid, {
+                id: uid,
                 name: row.full_name,
                 email: row.email,
-                avatar: row.profile_picture, // Map profile_picture to avatar for frontend compatibility
+                avatar: row.profile_picture,
             });
         });
 
@@ -48,14 +50,13 @@ const enrichChatsWithUserData = async (chats) => {
     chatObjects.forEach((chat) => {
         if (Array.isArray(chat.participants)) {
             chat.participants.forEach((p) => {
-                // p might be an object if checking types, but schema says Number
-                if (typeof p === "number") userIds.add(p);
-                else if (p && p.id) userIds.add(p.id); // safeguards
+                if (typeof p === "number" || typeof p === "bigint") userIds.add(Number(p));
+                else if (p && p.id) userIds.add(Number(p.id));
             });
         }
-        if (chat.requestedBy) userIds.add(chat.requestedBy);
-        if (chat.lastSenderId) userIds.add(chat.lastSenderId);
-        if (chat.blockedBy) userIds.add(chat.blockedBy);
+        if (chat.requestedBy) userIds.add(Number(chat.requestedBy));
+        if (chat.lastSenderId) userIds.add(Number(chat.lastSenderId));
+        if (chat.blockedBy) userIds.add(Number(chat.blockedBy));
     });
 
     const userMap = await getUsersFromMySQL(userIds);
@@ -65,23 +66,26 @@ const enrichChatsWithUserData = async (chats) => {
     return chatObjects.map((chat) => {
         // Enrich participants
         chat.participants = chat.participants.map((pId) => {
-            const id = typeof pId === "object" ? pId : pId; // Handle if already object (shouldn't be)
+            const id = Number(typeof pId === "object" ? pId.id || pId : pId);
             return userMap.get(id) || { ...unknownUser, id };
         });
 
         // Enrich requestedBy
         if (chat.requestedBy) {
-            chat.requestedBy = userMap.get(chat.requestedBy) || { ...unknownUser, id: chat.requestedBy };
+            const rbId = Number(chat.requestedBy);
+            chat.requestedBy = userMap.get(rbId) || { ...unknownUser, id: rbId };
         }
 
         // Enrich lastSenderId
         if (chat.lastSenderId) {
-            chat.lastSenderId = userMap.get(chat.lastSenderId) || { ...unknownUser, id: chat.lastSenderId };
+            const lsId = Number(chat.lastSenderId);
+            chat.lastSenderId = userMap.get(lsId) || { ...unknownUser, id: lsId };
         }
 
         // Enrich blockedBy
         if (chat.blockedBy) {
-            chat.blockedBy = userMap.get(chat.blockedBy) || { ...unknownUser, id: chat.blockedBy };
+            const bbId = Number(chat.blockedBy);
+            chat.blockedBy = userMap.get(bbId) || { ...unknownUser, id: bbId };
         }
 
         return chat;
@@ -339,9 +343,8 @@ export const createOrGetChat = async (req, res) => {
         // Create new chat
         chat = new ChatModel({
             participants: [userId, recipientIdNum],
-            status: "auto_accepted",
+            status: "pending",
             requestedBy: userId,
-            acceptedAt: new Date(),
             unreadCount: new Map(),
         });
 
@@ -810,7 +813,7 @@ export const sendMessageToChat = async (req, res) => {
         const chat = await ChatModel.findOne({
             _id: chatId,
             participants: userId,
-            status: { $in: ["accepted", "auto_accepted", "pending"] },
+            status: { $in: ["accepted", "auto_accepted"] },
         });
 
         if (!chat) {
@@ -851,6 +854,23 @@ export const sendMessageToChat = async (req, res) => {
         chat.unreadCount.set(receiverId.toString(), unreadCount + 1);
 
         await chat.save();
+
+        // Emit socket event so the receiver gets the message in real-time
+        try {
+            const io = getIO();
+            const roomName = `chat_${chatId}`;
+            io.to(roomName).emit("message_received", {
+                messageId: newMessage._id,
+                chatId,
+                senderId: userId,
+                receiverId,
+                content: newMessage.content,
+                messageType: "text",
+                createdAt: newMessage.createdAt,
+            });
+        } catch (socketErr) {
+            console.error("Socket emit error (non-fatal):", socketErr.message);
+        }
 
         // Convert to plain object for response
         const messageObj = newMessage.toObject();

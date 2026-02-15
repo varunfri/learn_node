@@ -219,15 +219,22 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/chats/{{chatId}}/accept",
+                  "raw": "{{base_url}}/api/chats/:chatId/accept",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "api",
                     "chats",
-                    "{{chatId}}",
+                    ":chatId",
                     "accept"
+                  ],
+                  "variable": [
+                    {
+                      "key": "chatId",
+                      "value": "123",
+                      "uuid": "26d39c28-525f-4cd8-83ae-f807e0c85a3f"
+                    }
                   ]
                 },
                 "description": "Accept a pending chat request"

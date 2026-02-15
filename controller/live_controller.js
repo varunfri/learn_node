@@ -1,5 +1,6 @@
 import { mysql_db } from "../db_config/mysql_connect.js";
 import { getIO } from "../utils/init_socket.js";
+import crypto from 'crypto';
 
 
 export const go_live = async (req, res) => {
@@ -28,39 +29,45 @@ export const go_live = async (req, res) => {
         );
 
         let stream_id;
+        let shouldCreateNew = false;
 
         if (existing.length === 0) {
+            shouldCreateNew = true;
+        } else {
+            const { stream_id: existingStreamId, status } = existing[0];
+
+            if (status === 'live') {
+                // User is already live (stale session), end it and create new
+                await connection.query(
+                    `UPDATE user_streams 
+                     SET status = 'end', ended_at = NOW() 
+                     WHERE stream_id = ?`,
+                    [existingStreamId]
+                );
+                shouldCreateNew = true;
+            } else {
+                // Paused or created → resume / go live
+                stream_id = existingStreamId;
+
+                await connection.query(
+                    `UPDATE user_streams
+                     SET status = 'live'
+                     WHERE stream_id = ?`,
+                    [stream_id]
+                );
+            }
+        }
+
+        if (shouldCreateNew) {
+            const stream_key = crypto.randomBytes(16).toString('hex');
             const [insert] = await connection.query(
                 `INSERT INTO user_streams 
-                 (user_id, is_audio, status, is_live, started_at) 
-                 VALUES (?, ?, 'live', 1, NOW())`,
-                [user_id, is_audio ? 1 : 0]
+                 (user_id, is_audio, status, started_at, stream_key) 
+                 VALUES (?, ?, 'live', NOW(), ?)`,
+                [user_id, is_audio ? 1 : 0, stream_key]
             );
 
             stream_id = insert.insertId;
-        }
-        else {
-            const { stream_id: existingStreamId, status } = existing[0];
-
-
-            if (status === 'live') {
-                await connection.rollback();
-
-                return res.status(400).json({
-                    status: 400,
-                    message: "User is already live"
-                });
-            }
-
-            // Paused or created → resume / go live
-            stream_id = existingStreamId;
-
-            await connection.query(
-                `UPDATE user_streams
-                 SET status = 'live'
-                 WHERE stream_id = ?`,
-                [stream_id]
-            );
         }
 
         await connection.commit();
@@ -87,9 +94,29 @@ export const go_live = async (req, res) => {
         await connection.rollback();
         console.error("go_live error:", err);
 
+        // Self-healing: Drop the unique index if it exists and retry
+        // uniq_user_live_stream prevents users from having >1 not-live stream (is_live=0) which is wrong.
+        if (err.code === 'ER_DUP_ENTRY' && (err.message.includes('uniq_user_live_stream') || (err.sqlMessage && err.sqlMessage.includes('uniq_user_live_stream')))) {
+            try {
+                console.log("Found problematic unique index 'uniq_user_live_stream'. Dropping it...");
+                // Note: ALTER TABLE causes implicit commit, but we already rolled back above.
+                // We use a fresh query here (not part of the failed transaction).
+                await mysql_db.query("ALTER TABLE user_streams DROP INDEX uniq_user_live_stream");
+                console.log("Index dropped successfully.");
+
+                return res.status(500).json({
+                    status: 500,
+                    message: "Database schema updated (problematic index dropped). PLEASE TRY GOING LIVE AGAIN IMMEDIATELY."
+                });
+
+            } catch (dropErr) {
+                console.error("Failed to drop index:", dropErr);
+            }
+        }
+
         res.status(500).json({
             status: 500,
-            message: "Unable to go live"
+            message: "Unable to go live: " + (err.sqlMessage || err.message)
         });
     } finally {
         connection.release();
@@ -129,7 +156,7 @@ export const pause_live = async (req, res) => {
         // Update stream to paused
         const [updateResult] = await connection.query(
             `UPDATE user_streams 
-             SET status = 'paused', is_paused = 1, paused_at = NOW() 
+             SET status = 'paused', paused_at = NOW() 
              WHERE stream_id = ?`,
             [stream_id]
         );
@@ -187,7 +214,7 @@ export const resume_live = async (req, res) => {
 
         // Verify stream belongs to user and is paused
         const [stream] = await connection.query(
-            `SELECT stream_id, is_audio FROM user_streams WHERE stream_id = ? AND user_id = ? AND is_paused = 1`,
+            `SELECT stream_id, is_audio FROM user_streams WHERE stream_id = ? AND user_id = ? AND status = 'paused'`,
             [stream_id, user_id]
         );
 
@@ -273,7 +300,7 @@ export const end_live = async (req, res) => {
         // Update stream to ended
         const [updateResult] = await connection.query(
             `UPDATE user_streams 
-             SET status = 'end', is_live = 0, is_paused = 0, ended_at = NOW() 
+             SET status = 'end', ended_at = NOW() 
              WHERE stream_id = ?`,
             [stream_id]
         );
@@ -327,8 +354,8 @@ export const get_video_lives = async (req, res) => {
             COALESCE(uvl.vip_level_id, 0) AS vip_level_id,
             us.stream_id,
             us.started_at,
-            us.current_viewers,
-            us.total_views,
+            0 AS current_viewers,
+            0 AS total_views,
             COALESCE(ug.total_coins_earned, 0) AS total_coins_earned
         FROM user_streams us
         INNER JOIN users u
@@ -355,13 +382,11 @@ export const get_video_lives = async (req, res) => {
         ) ug
             ON ug.receiver_id = u.user_id
         WHERE us.is_live = 1
-        AND us.is_paused = 0 
         AND us.is_audio = 0
-        AND us.user_id <> ?
         ORDER BY
             COALESCE(uvl.vip_level_id, 0) DESC,
             us.started_at DESC;
-        `, [id]);
+        `);
 
 
 
@@ -393,10 +418,10 @@ export const get_video_lives = async (req, res) => {
             data: data, //this will be accessd by all users
         })
     } catch (e) {
-        console.log("Error while executing get_live_users: ", e);
+        console.log("Error while executing get_video_lives: ", e);
         return res.status(500).json({
             status: 500,
-            message: "Internal server error"
+            message: "Internal server error: " + e.message
         });
     }
 };
@@ -414,8 +439,8 @@ export const get_audio_lives = async (req, res) => {
     COALESCE(uvl.vip_level_id, 0) AS vip_level_id,
     us.stream_id,
     us.started_at,
-    us.current_viewers,
-    us.total_views
+            0 AS current_viewers,
+            0 AS total_views
     FROM user_streams us
     INNER JOIN users u
         ON u.user_id = us.user_id

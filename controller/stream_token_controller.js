@@ -5,17 +5,17 @@ const { RtcTokenBuilder, RtcRole } = agora;
 export const agora_token = async (req, res) => {
     const app_id = process.env.AGORA_APP_ID;
     const app_cert = process.env.AGORA_APP_CERTIFICATE;
-    if (!req.body || Object.keys(req.body).length === 0) {
+    if ((!req.body || Object.keys(req.body).length === 0) && (!req.query || Object.keys(req.query).length === 0)) {
         return res.status(400).json({
             status: 400,
-            message: "Request body is required"
+            message: "Request body or query params required"
         });
     }
 
-    const { uid, channelName, role } = req.body || {};
+    const { uid, channelName, role } = { ...req.body, ...req.query };
 
 
-    if (!uid || !channelName || !role) {
+    if (uid === undefined || uid === null || !channelName || !role) {
         return res.status(400).json({
             status: 400,
             message: "channel name, uid and role is required"

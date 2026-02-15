@@ -264,6 +264,7 @@ export const getChatMessagesById = async (req, res) => {
         const enrichedMessages = await enrichMessagesWithUserData(messages);
 
         // Filter out deleted messages for this user
+        // Filter out deleted messages for this user
         const filteredMessages = enrichedMessages
             .map((msg) => {
                 if (msg.deletedBy && msg.deletedBy.includes(userId)) {
@@ -271,8 +272,7 @@ export const getChatMessagesById = async (req, res) => {
                     msg.media = null;
                 }
                 return msg;
-            })
-            .reverse(); // Reverse to get chronological order
+            });
 
         return res.status(200).json({
             status: 200,

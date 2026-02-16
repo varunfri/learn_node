@@ -61,7 +61,7 @@ io.on("connection", async (socket) => {
 const startServer = async () => {
     try {
         // if any awaits do pass here
-        await connectMongo();
+        process.env.MYSQL_HOST == "localhost" ? null : await connectMongo();
         await connect_mysql();
 
         const port = process.env.PORT || 8000;

@@ -33,7 +33,7 @@ io.on("connection", async (socket) => {
 
     // Initialize socket handlers
     messageSocketHandlers(io, socket);
-    liveStreamHandlers(io, socket);
+    liveStreamHandlers(io, socket, onlineUsers);
 
     socket.on("disconnect", async () => {
         const userSockets = onlineUsers.get(user_id);

@@ -1,287 +1,201 @@
 import { mysql_db } from "../../db_config/mysql_connect.js";
-import { onlineUsers } from "../../server.js";
+// NO IMPORTS from server.js to avoid circular dependency
 
-export const liveStreamHandlers = (io, socket) => {
-    /**
-     * Join live stream room
-     * Emitted by: Client watching a live stream
-     * Data: { stream_id, user_id (broadcaster) }
-     */
+export const liveStreamHandlers = (io, socket, onlineUsers) => {
+
+    // Helper to get sockets regardless of string/int type mismatch
+    const getSocketsForUser = (userId) => {
+        if (!onlineUsers) return null;
+        // Try exact match
+        if (onlineUsers.has(userId)) return onlineUsers.get(userId);
+
+        // Try number casting
+        const numId = Number(userId);
+        if (!isNaN(numId) && onlineUsers.has(numId)) return onlineUsers.get(numId);
+
+        // Try string casting
+        const strId = String(userId);
+        if (onlineUsers.has(strId)) return onlineUsers.get(strId);
+
+        return null;
+    };
+
     socket.on("join_live", async ({ stream_id, broadcaster_id }) => {
         try {
-            const viewer_id = socket.user.id;
+            console.log(`[LiveSocket] User joined stream ${stream_id}`);
+            const roomName = `live_stream_${stream_id}`;
+            const user_id = socket.user.id;
 
-            // Verify stream exists and is live
-            const [stream] = await mysql_db.query(
-                `SELECT stream_id, user_id, is_audio FROM user_streams WHERE stream_id = ? AND status = 'live'`,
-                [stream_id]
-            );
-
-            if (stream.length === 0) {
-                socket.emit("error", { message: "Stream not found or not live" });
-                return;
-            }
-
-            // Join socket room for this stream
-            const roomName = `stream_${stream_id}`;
             socket.join(roomName);
+            console.log(`User ${user_id} joined room ${roomName}`);
 
-            // Increment viewer count
-            await mysql_db.query(
-                `UPDATE user_streams SET current_viewers = COALESCE(current_viewers, 0) + 1 WHERE stream_id = ?`,
-                [stream_id]
-            );
+            // Get current viewer count safely
+            const room = io.sockets.adapter.rooms.get(roomName);
+            const viewerCount = room ? room.size : 0;
 
-            // Notify broadcaster of new viewer
-            const broadcasterSockets = onlineUsers.get(broadcaster_id);
+            // Notify everyone in the room about the new viewer count
+            io.to(roomName).emit("viewer_count_update", {
+                stream_id,
+                count: viewerCount
+            });
+
+            // Notify the broadcaster that a user joined
+            const broadcasterSockets = getSocketsForUser(broadcaster_id);
+
             if (broadcasterSockets) {
                 broadcasterSockets.forEach(socketId => {
-                    io.to(socketId).emit("viewer_joined", {
-                        stream_id,
-                        viewer_id,
-                        timestamp: new Date()
+                    io.to(socketId).emit("new_viewer_joined", {
+                        user_id: user_id,
+                        username: socket.user.username || "Guest",
+                        profile_picture: socket.user.profile_picture || ""
                     });
                 });
             }
 
-            // Notify all viewers in stream
-            io.to(roomName).emit("viewer_count_updated", {
-                stream_id,
-                viewer_count: stream.length
-            });
-
-            socket.emit("join_live_success", {
-                stream_id,
-                is_audio: stream[0].is_audio,
-                message: "Joined live stream"
-            });
-
-        } catch (e) {
-            console.log("Error joining live stream:", e);
+        } catch (error) {
+            console.log(error);
             socket.emit("error", { message: "Failed to join live stream" });
         }
     });
 
-    /**
-     * Leave live stream room
-     * Emitted by: Client leaving a live stream
-     */
-    socket.on("leave_live", async ({ stream_id, broadcaster_id }) => {
+    socket.on("leave_live", ({ stream_id }) => {
+        const roomName = `live_stream_${stream_id}`;
+        socket.leave(roomName);
+        console.log(`User left room ${roomName}`);
+
+        const room = io.sockets.adapter.rooms.get(roomName);
+        const viewerCount = room ? room.size : 0;
+
+        io.to(roomName).emit("viewer_count_update", {
+            stream_id,
+            count: viewerCount
+        });
+    });
+
+    socket.on("send_comment", async ({ stream_id, text, user_name }) => {
         try {
-            const viewer_id = socket.user.id;
-            const roomName = `stream_${stream_id}`;
+            const roomName = `live_stream_${stream_id}`;
+            const user_id = socket.user.id;
 
-            // Leave socket room
-            socket.leave(roomName);
+            // Save comment to database can be added here if needed
+            // For now just echo it back
+            io.to(roomName).emit("new_comment", {
+                user_id: user_id,
+                user_name: user_name || socket.user.username,
+                message: text,
+                timestamp: new Date()
+            });
+        } catch (e) {
+            console.log("Error sending comment:", e);
+        }
+    });
 
-            // Decrement viewer count
-            await mysql_db.query(
-                `UPDATE user_streams SET current_viewers = GREATEST(COALESCE(current_viewers, 1) - 1, 0) WHERE stream_id = ?`,
-                [stream_id]
-            );
+    socket.on("send_gift", async ({ stream_id, gift_id, gift_name, sender_name }) => {
+        try {
+            const roomName = `live_stream_${stream_id}`;
+            io.to(roomName).emit("new_gift", {
+                sender_id: socket.user.id,
+                sender_name: sender_name || socket.user.username,
+                gift_id,
+                gift_name,
+                timestamp: new Date()
+            });
+        } catch (e) {
+            console.log("Error sending gift:", e);
+        }
+    });
 
-            // Notify broadcaster of viewer leaving
-            const broadcasterSockets = onlineUsers.get(broadcaster_id);
-            if (broadcasterSockets) {
+    // ----------------------------------------------------
+    // NEW: JOIN REQUEST HANDLING (Tango Style)
+    // ----------------------------------------------------
+
+    // 1. Viewer requests to join
+    socket.on("request_to_join", async ({ stream_id, broadcaster_id }) => {
+        try {
+            console.log(`[LiveSocket] Join request from ${socket.user.id} to host ${broadcaster_id} for stream ${stream_id}`);
+
+            const requesterData = {
+                user_id: socket.user.id,
+                full_name: socket.user.full_name || socket.user.username || "Viewer",
+                username: socket.user.username,
+                profile_picture: socket.user.profile_picture
+            };
+
+            // Notify the host
+            const broadcasterSockets = getSocketsForUser(broadcaster_id);
+
+            if (broadcasterSockets && broadcasterSockets.size > 0) {
+                console.log(`[LiveSocket] Host ${broadcaster_id} found. Emitting request...`);
                 broadcasterSockets.forEach(socketId => {
-                    io.to(socketId).emit("viewer_left", {
+                    io.to(socketId).emit("join_request_received", {
                         stream_id,
-                        viewer_id,
+                        requester: requesterData,
+                        timestamp: new Date()
+                    });
+                });
+
+                // Confirm to requester
+                socket.emit("join_request_sent", { success: true });
+            } else {
+                console.log(`[LiveSocket] Host ${broadcaster_id} NOT found in onlineUsers.`);
+                // We don't log keys here to avoid spam/leaks but we know lookup failed
+                socket.emit("error", { message: "Host is not available" });
+            }
+
+        } catch (error) {
+            console.error("[LiveSocket] Error in request_to_join:", error);
+            socket.emit("error", { message: "Failed to process join request" });
+        }
+    });
+
+    // 2. Host accepts/rejects request
+    socket.on("respond_join_request", async ({ stream_id, requester_id, accepted }) => {
+        try {
+            console.log(`[LiveSocket] Host responded to ${requester_id}: ${accepted ? 'Accepted' : 'Rejected'}`);
+
+            const requesterSockets = getSocketsForUser(requester_id);
+
+            if (requesterSockets && requesterSockets.size > 0) {
+                const eventName = accepted ? "join_request_accepted" : "join_request_rejected";
+
+                requesterSockets.forEach(socketId => {
+                    io.to(socketId).emit(eventName, {
+                        stream_id,
+                        host_id: socket.user.id,
                         timestamp: new Date()
                     });
                 });
             }
 
-            socket.emit("leave_live_success", { stream_id });
+            if (accepted) {
+                const roomName = `live_stream_${stream_id}`;
+                io.to(roomName).emit("co_broadcaster_added", {
+                    user_id: requester_id,
+                    stream_id
+                });
+            }
 
-        } catch (e) {
-            console.log("Error leaving live stream:", e);
-            socket.emit("error", { message: "Failed to leave live stream" });
+        } catch (error) {
+            console.error("[LiveSocket] Error in respond_join_request:", error);
         }
     });
 
-    /**
-     * Send gift during live stream
-     * Emitted by: Viewer sending gift to broadcaster
-     */
-    socket.on("send_gift", async ({ stream_id, gift_id, broadcaster_id, coin_amount }) => {
+    // 3. Co-broadcaster leaves (or is removed)
+    socket.on("leave_co_broadcast", async ({ stream_id, broadcaster_id }) => {
         try {
-            const sender_id = socket.user.id;
-
-            if (sender_id === broadcaster_id) {
-                socket.emit("error", { message: "Cannot send gift to yourself" });
-                return;
-            }
-
-            // Verify gift exists
-            const [gift] = await mysql_db.query(
-                `SELECT gift_id, name, icon FROM gifts WHERE gift_id = ?`,
-                [gift_id]
-            );
-
-            if (gift.length === 0) {
-                socket.emit("error", { message: "Gift not found" });
-                return;
-            }
-
-            // Check sender has enough coins
-            const [wallet] = await mysql_db.query(
-                `SELECT balance FROM user_wallets WHERE user_id = ?`,
-                [sender_id]
-            );
-
-            if (wallet.length === 0 || wallet[0].balance < coin_amount) {
-                socket.emit("error", { message: "Insufficient coins" });
-                return;
-            }
-
-            const connection = await mysql_db.getConnection();
-
-            try {
-                await connection.beginTransaction();
-
-                // Deduct coins from sender
-                await connection.query(
-                    `UPDATE user_wallets SET balance = balance - ? WHERE user_id = ?`,
-                    [coin_amount, sender_id]
-                );
-
-                // Add coins to broadcaster
-                await connection.query(
-                    `UPDATE user_wallets SET balance = balance + ? WHERE user_id = ?`,
-                    [coin_amount, broadcaster_id]
-                );
-
-                // Record transaction
-                await connection.query(
-                    `INSERT INTO gift_transactions (stream_id, sender_id, receiver_id, gift_id, coin_amount, created_at)
-                     VALUES (?, ?, ?, ?, ?, NOW())`,
-                    [stream_id, sender_id, broadcaster_id, gift_id, coin_amount]
-                );
-
-                await connection.commit();
-
-                const roomName = `stream_${stream_id}`;
-
-                // Notify broadcaster
-                const broadcasterSockets = onlineUsers.get(broadcaster_id);
-                if (broadcasterSockets) {
-                    broadcasterSockets.forEach(socketId => {
-                        io.to(socketId).emit("gift_received", {
-                            stream_id,
-                            sender_id,
-                            gift_name: gift[0].name,
-                            gift_icon: gift[0].icon,
-                            coin_amount,
-                            timestamp: new Date()
-                        });
-                    });
-                }
-
-                // Notify all viewers
-                io.to(roomName).emit("gift_sent_notification", {
-                    stream_id,
-                    sender_id,
-                    gift_name: gift[0].name,
-                    gift_icon: gift[0].icon,
-                    timestamp: new Date()
-                });
-
-                socket.emit("gift_sent_success", {
-                    stream_id,
-                    gift_id,
-                    coin_amount,
-                    message: "Gift sent successfully"
-                });
-
-            } catch (e) {
-                await connection.rollback();
-                throw e;
-            } finally {
-                connection.release();
-            }
-
-        } catch (e) {
-            console.log("Error sending gift:", e);
-            socket.emit("error", { message: "Failed to send gift" });
-        }
-    });
-
-    /**
-     * Send comment during live stream
-     * Emitted by: Viewer sending comment
-     */
-    socket.on("send_comment", async ({ stream_id, text, broadcaster_id }) => {
-        try {
+            const roomName = `live_stream_${stream_id}`;
             const user_id = socket.user.id;
-            const roomName = `stream_${stream_id}`;
 
-            // Save comment to database
-            const [result] = await mysql_db.query(
-                `INSERT INTO live_comments (stream_id, user_id, text, created_at)
-                 VALUES (?, ?, ?, NOW())`,
-                [stream_id, user_id, text]
-            );
+            console.log(`[LiveSocket] User ${user_id} leaving co-broadcast`);
 
-            // Notify all viewers in stream
-            io.to(roomName).emit("new_comment", {
-                stream_id,
-                user_id,
-                text,
-                comment_id: result.insertId,
-                timestamp: new Date()
+            io.to(roomName).emit("co_broadcaster_left", {
+                user_id: user_id,
+                stream_id
             });
 
-            socket.emit("comment_sent_success", {
-                comment_id: result.insertId,
-                message: "Comment sent"
-            });
-
-        } catch (e) {
-            console.log("Error sending comment:", e);
-            socket.emit("error", { message: "Failed to send comment" });
+        } catch (error) {
+            console.error("[LiveSocket] Error in leave_co_broadcast:", error);
         }
     });
 
-    /**
-     * Update viewer status (e.g., audio/video on/off)
-     * Emitted by: Broadcaster updating stream settings
-     */
-    socket.on("update_stream_status", async ({ stream_id, is_muted, is_video_off }) => {
-        try {
-            const broadcaster_id = socket.user.id;
-            const roomName = `stream_${stream_id}`;
-
-            // Verify stream belongs to broadcaster
-            const [stream] = await mysql_db.query(
-                `SELECT stream_id FROM user_streams WHERE stream_id = ? AND user_id = ? AND status = 'live'`,
-                [stream_id, broadcaster_id]
-            );
-
-            if (stream.length === 0) {
-                socket.emit("error", { message: "Stream not found or not live" });
-                return;
-            }
-
-            // Notify all viewers
-            io.to(roomName).emit("stream_status_changed", {
-                stream_id,
-                is_muted,
-                is_video_off,
-                timestamp: new Date()
-            });
-
-        } catch (e) {
-            console.log("Error updating stream status:", e);
-            socket.emit("error", { message: "Failed to update stream status" });
-        }
-    });
-
-    /**
-     * Disconnect handler
-     */
-
-    // socket.on("disconnect", () => {
-    //     console.log(`User ${socket.user.id} disconncted from live stream,`);
-    // });
 };

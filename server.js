@@ -23,15 +23,26 @@ export const onlineUsers = new Map();
 
 io.on("connection", async (socket) => {
     const user_id = socket.user.id;
-    onlineUsers.set(user_id, socket.id);
+
+    // Store a Set of socket IDs per user (supports multiple connections)
+    if (!onlineUsers.has(user_id)) {
+        onlineUsers.set(user_id, new Set());
+    }
+    onlineUsers.get(user_id).add(socket.id);
     console.log(`User ${user_id} connected with socket ${socket.id}`);
 
     // Initialize socket handlers
     messageSocketHandlers(io, socket);
-    liveStreamHandlers(io, socket);
+    liveStreamHandlers(io, socket, onlineUsers);
 
     socket.on("disconnect", async () => {
-        onlineUsers.delete(user_id);
+        const userSockets = onlineUsers.get(user_id);
+        if (userSockets) {
+            userSockets.delete(socket.id);
+            if (userSockets.size === 0) {
+                onlineUsers.delete(user_id);
+            }
+        }
         console.log(`User ${user_id} disconnected from socket ${socket.id}`);
         socket.rooms.forEach(roomName => {
             if (roomName.startsWith("chat_")) {

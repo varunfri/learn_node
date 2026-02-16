@@ -9,6 +9,8 @@ export const mysql_db = mysql.createPool({
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASS,
     database: process.env.MYSQL_DB,
+    connectTimeout: process.env.MYSQL_HOST == "localhost" ? 0 : 15000, // 30 seconds
+    acquireTimeout: process.env.MYSQL_HOST == "localhost" ? 0 : 15000, // 30 seconds
     multipleStatements: true,
     waitForConnections: true,
     dateStrings: true

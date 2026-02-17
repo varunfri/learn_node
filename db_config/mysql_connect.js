@@ -13,6 +13,10 @@ export const mysql_db = mysql.createPool({
     acquireTimeout: process.env.MYSQL_HOST == "localhost" ? 0 : 15000, // 30 seconds
     multipleStatements: true,
     waitForConnections: true,
+    connectionLimit: 10,
+    connectTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
     dateStrings: true
 });
 
